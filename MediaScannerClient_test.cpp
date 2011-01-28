@@ -30,6 +30,23 @@ namespace android {
 static StringArray *results = NULL;
 
 class TestableMediaScannerClient : public MediaScannerClient {
+    private:
+        void latin1_to_utf8(const char *src, char* dest) {
+            char *wp = dest;
+            char c;
+
+            for (unsigned int i=0; i < strlen(src); i++) {
+                c = src[i];
+                if (c & 0x80) {
+                    *(wp++) = (src[i] >> 6) + 0xc0 & 0xff;
+                    *(wp++) = (src[i] & 0x3f) + 0x80;
+                } else {
+                    *(wp++) = src[i];
+                }
+            }
+            *wp = 0;
+        }
+
     public:
         using MediaScannerClient::mNames;
         using MediaScannerClient::mValues;
@@ -40,7 +57,7 @@ class TestableMediaScannerClient : public MediaScannerClient {
         bool setMimeType(const char* mimeType) { return true; }
         bool addNoMediaFolder(const char* path) { return true; }
 
-        // var. name used as index for sorting result.
+        // the name will used for sorting value order on results.
         bool handleStringTag(const char* name, const char* value) {
             if (results == NULL)
                 return false;
@@ -59,6 +76,15 @@ class TestableMediaScannerClient : public MediaScannerClient {
             return true;
         }
 
+        bool addNativeStringTag(const char* name, const char* value) {
+            char *n_value = new char[strlen(value) * 2 + 1];
+            latin1_to_utf8(value, n_value);
+
+            bool ret = addStringTag(name, n_value);
+            delete[] n_value;
+
+            return ret;
+        }
 };
 
 class MediaScannerClientTest : public testing::Test {
@@ -92,23 +118,6 @@ TEST_F(MediaScannerClientTest, IsResultSorted) {
     EXPECT_STREQ(results->getEntry(2), "3third");
 }
 
-static void latin1_to_utf8(const char *src, char* dest) {
-    char *wp = dest;
-    char c;
-
-    for (unsigned int i=0; i < strlen(src); i++) {
-        c = src[i];
-        if (c & 0x80) {
-            *(wp++) = (src[i] >> 6) + 0xc0 & 0xff;
-            *(wp++) = (src[i] & 0x3f) + 0x80;
-        } else {
-            *(wp++) = src[i];
-        }
-    }
-
-    *wp = 0;
-}
-
 #define SIZE_STR_COMBO(x) sizeof(x)/sizeof(str_pair)
 
 static void __insert_native_table(TestableMediaScannerClient *client,
@@ -119,12 +128,7 @@ static void __insert_native_table(TestableMediaScannerClient *client,
         char idx[3];
         sprintf(idx, "%02d", i);
         if (is_native) {
-            char *value = new char[strlen(table[i].native) * 2 + 1];
-
-            latin1_to_utf8(table[i].native, value);
-            client->addStringTag(idx, value);
-
-            delete[] value;
+            client->addNativeStringTag(idx, table[i].native);
         } else {
             client->addStringTag(idx, table[i].native);
         }
@@ -135,7 +139,7 @@ static void __insert_native_table(TestableMediaScannerClient *client,
 
     for (unsigned int i = 0; i < table_size; i++) {
         // skip idx string from result.
-        EXPECT_STREQ(results->getEntry(i)+2, table[i].utf_8);
+        EXPECT_STREQ(results->getEntry(i) + 2, table[i].utf_8);
     }
 }
 #define insert_native_table(c, t, n) __insert_native_table(c, t, SIZE_STR_COMBO(t), n)
@@ -200,22 +204,35 @@ TEST_F(MediaScannerClientTest, EUC_KR) {
     insert_native_table(client, strs_EUC_KR, true);
 }
 
-TEST_F(MediaScannerClientTest, GBK) {
-    client->setLocale("zh_CN");
-    insert_native_table(client, strs_GB2312, true);
-}
-
 TEST_F(MediaScannerClientTest, SHIFT_JIS) {
     client->setLocale("ja");
     insert_native_table(client, strs_SHIFT_JIS, true);
 }
 
-#if 0
+TEST_F(MediaScannerClientTest, GBK) {
+    client->setLocale("zh_CN");
+    insert_native_table(client, strs_GB2312, true);
+}
+
 TEST_F(MediaScannerClientTest, BIG5) {
     client->setLocale("zh");
     insert_native_table(client, strs_Big5, true);
 }
-#endif
 
+TEST_F(MediaScannerClientTest, native_with_utf_8) {
+    client->setLocale("ko");
+
+    client->beginFile();
+    client->addStringTag("00", "Hello ASCII");
+    client->addStringTag("01", strs_utf_8[0].native);
+    client->addNativeStringTag("02", strs_EUC_KR[0].native);
+    client->endFile();
+
+    results->sort(StringArray::cmpAscendingAlpha);
+
+    EXPECT_STREQ(results->getEntry(0) + 2, "Hello ASCII");
+    EXPECT_STREQ(results->getEntry(1) + 2, strs_utf_8[0].utf_8);
+    EXPECT_STREQ(results->getEntry(2) + 2, strs_EUC_KR[0].utf_8);
+}
 
 }
