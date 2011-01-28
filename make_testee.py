@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
- 
+
 # make_testee.py - make testee.h from cddb
 #
 # Copyright (C) 2011 Homin Lee <ff4500@gmail.com>
@@ -19,12 +19,12 @@ freedbAddr = "http://ftp.freedb.org/pub/freedb/"
 dbNameTemplete = "freedb-update-%s-%s.tar.bz2"
 
 yearStart, monthStart = 2010, 6
-yearEnd, monthEnd = 2010, 8
+yearEnd, monthEnd = 2010, 12
 
-itemCntForEachEncoding = 5 
+itemCntForEachEncoding = 50
 outputName = "testee.h"
 
-# EUC-JP only needed for when no SHIFT-JIS found.
+# hardly find SHIFT-JIS strings. so made it from EUC-JP strings
 encodings = ['utf-8', 'windows-1252', 'EUC-KR', 'EUC-JP', 'Big5', 'GB2312']
 
 for y in range(yearStart, yearEnd + 1):
@@ -46,16 +46,13 @@ for y in range(yearStart, yearEnd + 1):
         #print downAddr
         os.system("wget " + downAddr)
 
-os.system('mkdir -p db_raw')
+os.system('mkdir -p cddb')
 
-'''
 for z in glob.glob("*.tar.bz2"):
-    os.system("tar -C db_raw -xvjf " + z)
-'''
+    os.system("tar -C cddb -xvjf " + z)
 
-cds = glob.glob("db_raw/*/*")
-print len(cds)
-
+cds = glob.glob("cddb/*/*")
+print "Generating %s from %d cddb items.."%(outputName, len(cds))
 
 testeeDict = {}
 
@@ -115,7 +112,7 @@ for cd in cds:
 
 
 
-# if no shift-jis found make it from euc-jp            
+# if no shift-jis found make it from euc-jp
 if not "SHIFT-JIS" in testeeDict.keys():
     if "EUC-JP" in testeeDict.keys():
         testeeDict["SHIFT-JIS"] = \
@@ -149,11 +146,11 @@ for enc in testeeDict.keys():
                 wp.write('    {"%s", "%s"},\n'
                         %(escapeAscii(text), text.decode(enc).encode('utf-8')))
             except:
-                wp.write('    {"%s", "%s"}, // can\'t decode by python!\n'
+                wp.write('    //{"%s", "%s"}, // can\'t decode by python!\n'
                         %(escapeAscii(text), "???"))
     wp.write("};\n\n")
 
 wp.close()
 
-#os.system("rm -rf db_raw")
+#os.system("rm -rf cddb")
 #os.system("rm *.tar.bz2")

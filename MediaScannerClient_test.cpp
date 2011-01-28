@@ -38,8 +38,8 @@ class TestableMediaScannerClient : public MediaScannerClient {
             for (unsigned int i=0; i < strlen(src); i++) {
                 c = src[i];
                 if (c & 0x80) {
-                    *(wp++) = (src[i] >> 6) + 0xc0 & 0xff;
-                    *(wp++) = (src[i] & 0x3f) + 0x80;
+                    *(wp++) = ((src[i] >> 6) + 0xc0) & 0xff;
+                    *(wp++) = ((src[i] & 0x3f) + 0x80) & 0xff;
                 } else {
                     *(wp++) = src[i];
                 }
@@ -113,25 +113,27 @@ TEST_F(MediaScannerClientTest, IsResultSorted) {
 
     results->sort(StringArray::cmpAscendingAlpha);
 
-    EXPECT_STREQ(results->getEntry(0), "1first");
-    EXPECT_STREQ(results->getEntry(1), "2second");
-    EXPECT_STREQ(results->getEntry(2), "3third");
+    // jump to the value from results
+    EXPECT_STREQ(results->getEntry(0) + 1, "first");
+    EXPECT_STREQ(results->getEntry(1) + 1, "second");
+    EXPECT_STREQ(results->getEntry(2) + 1, "third");
 }
 
-#define SIZE_STR_COMBO(x) sizeof(x)/sizeof(str_pair)
-
-static void __insert_native_table(TestableMediaScannerClient *client,
+#define STRS_ARY_SIZE(x) sizeof(x)/sizeof(str_pair)
+static void __test_str_pairs(TestableMediaScannerClient *client,
         str_pair *table, unsigned int table_size, bool is_native) {
     client->beginFile();
 
     for (unsigned int i = 0; i < table_size; i++) {
-        char idx[3];
-        sprintf(idx, "%02d", i);
+        char idx[4 + 1];
+        sprintf(idx, "%04d", i);
         if (is_native) {
             client->addNativeStringTag(idx, table[i].native);
         } else {
             client->addStringTag(idx, table[i].native);
         }
+
+        ASSERT_FALSE(i > 9999);
     }
 
     client->endFile();
@@ -139,11 +141,12 @@ static void __insert_native_table(TestableMediaScannerClient *client,
 
     for (unsigned int i = 0; i < table_size; i++) {
         // skip idx string from result.
-        EXPECT_STREQ(results->getEntry(i) + 2, table[i].utf_8);
+        EXPECT_STREQ(results->getEntry(i) + 4, table[i].utf_8);
     }
 }
-#define insert_native_table(c, t, n) __insert_native_table(c, t, SIZE_STR_COMBO(t), n)
+#define test_str_pairs(c, t, n) __test_str_pairs(c, t, STRS_ARY_SIZE(t), n)
 
+// still good on ASCII
 TEST_F(MediaScannerClientTest, ASCII) {
     client->beginFile();
     client->addStringTag("Hello", "World");
@@ -151,75 +154,82 @@ TEST_F(MediaScannerClientTest, ASCII) {
     EXPECT_STREQ(results->getEntry(0), "HelloWorld");
 }
 
+// utf-8 should not be demaged by -whatever- current locale.
 TEST_F(MediaScannerClientTest, UTF_8) {
-    insert_native_table(client, strs_utf_8, false);
+    test_str_pairs(client, strs_utf_8, false);
 }
 
 TEST_F(MediaScannerClientTest, UTF_8_with_ko) {
     client->setLocale("ko");
-    insert_native_table(client, strs_utf_8, false);
+    test_str_pairs(client, strs_utf_8, false);
 }
 
 TEST_F(MediaScannerClientTest, UTF_8_with_ja) {
     client->setLocale("ja");
-    insert_native_table(client, strs_utf_8, false);
+    test_str_pairs(client, strs_utf_8, false);
 }
 
 TEST_F(MediaScannerClientTest, UTF_8_with_zh) {
     client->setLocale("zh");
-    insert_native_table(client, strs_utf_8, false);
+    test_str_pairs(client, strs_utf_8, false);
 }
 
 TEST_F(MediaScannerClientTest, UTF_8_with_zh_CN) {
     client->setLocale("zh_CN");
-    insert_native_table(client, strs_utf_8, false);
+    test_str_pairs(client, strs_utf_8, false);
 }
 
+// Latin-1 should not be demaged by -whatever- current locale
 TEST_F(MediaScannerClientTest, Latin_1) {
-    insert_native_table(client, strs_windows_1252, true);
+    test_str_pairs(client, strs_windows_1252, true);
 }
 
 TEST_F(MediaScannerClientTest, Latin_1_with_ko) {
     client->setLocale("ko");
-    insert_native_table(client, strs_windows_1252, true);
+    test_str_pairs(client, strs_windows_1252, true);
 }
 
 TEST_F(MediaScannerClientTest, Latin_1_with_ja) {
     client->setLocale("ja");
-    insert_native_table(client, strs_windows_1252, true);
+    test_str_pairs(client, strs_windows_1252, true);
 }
 
 TEST_F(MediaScannerClientTest, Latin_1_with_zh) {
     client->setLocale("zh");
-    insert_native_table(client, strs_windows_1252, true);
+    test_str_pairs(client, strs_windows_1252, true);
 }
 
 TEST_F(MediaScannerClientTest, Latin_1_with_zh_CN) {
     client->setLocale("zh_CN");
-    insert_native_table(client, strs_windows_1252, true);
+    test_str_pairs(client, strs_windows_1252, true);
 }
 
-TEST_F(MediaScannerClientTest, EUC_KR) {
+// euc-kr should be changed to utf-8 when current locale is "ko"
+TEST_F(MediaScannerClientTest, EUC_KR_with_ko) {
     client->setLocale("ko");
-    insert_native_table(client, strs_EUC_KR, true);
+    test_str_pairs(client, strs_EUC_KR, true);
 }
 
-TEST_F(MediaScannerClientTest, SHIFT_JIS) {
+// SHIFT-JIS should be changed to utf-8 when current locale is "ja"
+TEST_F(MediaScannerClientTest, SHIFT_JIS_with_ja) {
     client->setLocale("ja");
-    insert_native_table(client, strs_SHIFT_JIS, true);
+    test_str_pairs(client, strs_SHIFT_JIS, true);
 }
 
-TEST_F(MediaScannerClientTest, GBK) {
+// GBK should be changed to utf-8 when current locale is "zh_CN"
+TEST_F(MediaScannerClientTest, GBK_with_with_zh_CN) {
     client->setLocale("zh_CN");
-    insert_native_table(client, strs_GB2312, true);
+    test_str_pairs(client, strs_GB2312, true);
 }
 
-TEST_F(MediaScannerClientTest, BIG5) {
+// BIG should be changed to utf-8 when current locale is "zh"
+TEST_F(MediaScannerClientTest, BIG5_with_zh) {
     client->setLocale("zh");
-    insert_native_table(client, strs_Big5, true);
+    test_str_pairs(client, strs_Big5, true);
 }
 
-TEST_F(MediaScannerClientTest, native_with_utf_8) {
+// Some Korean id3 has mix-encoded values. :(
+TEST_F(MediaScannerClientTest, some_stupid_use_EUC_KR_and_utf_8_together) {
     client->setLocale("ko");
 
     client->beginFile();
