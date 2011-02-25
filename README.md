@@ -1,4 +1,6 @@
-unit-test for libmedia. 
+unit-test for my patch on tag encoding of libmedia:
+
+[libmedia: Fixed bug on mix-encoded tag of Korean mp3s.](http://review.cyanogenmod.com/#change,2956) MERGED!! yei~
 
 ## Download ##
 This test should placed under the libmedia
