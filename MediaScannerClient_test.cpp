@@ -245,4 +245,21 @@ TEST_F(MediaScannerClientTest, some_stupid_use_EUC_KR_and_utf_8_together) {
     EXPECT_STREQ(results->getEntry(2) + 2, strs_EUC_KR[0].utf_8);
 }
 
+// Some Korean id3 is chopped wrongly. :(
+TEST_F(MediaScannerClientTest, some_stupid_has_broken_cp949_string) {
+    client->setLocale("ko");
+
+    client->beginFile();
+    client->addNativeStringTag("00", "\xb9\xce\xc1\xd6\xb4\xe7\xb4\xe7\xb1\xc7\xc1\xd6\xc0\xda");
+    /* last character should '\xc0\xda', 자. \xda chopped! fxxx! */
+    client->addNativeStringTag("01", "\xb9\xce\xc1\xd6\xb4\xe7\xb4\xe7\xb1\xc7\xc1\xd6\xc0");
+    client->endFile();
+
+    results->sort(StringArray::cmpAscendingAlpha);
+
+    /* hope android smartly ignore last, unfinished character, \xc0 */
+    EXPECT_STREQ(results->getEntry(0) + 2, "민주당당권주자");
+    EXPECT_STREQ(results->getEntry(1) + 2, "민주당당권주");
+}
+
 }
