@@ -53,19 +53,19 @@ class TestableMediaScannerClient : public MediaScannerClient {
         using MediaScannerClient::mLocaleEncoding;
 
         // not use these members.
-        bool scanFile(const char* path, long long lastModified, long long fileSize) { return true; }
-        bool setMimeType(const char* mimeType) { return true; }
-        bool addNoMediaFolder(const char* path) { return true; }
+        status_t scanFile(const char* path, long long lastModified,
+                long long fileSize, bool isDirectory, bool noMedia)  { return OK; }
+        status_t setMimeType(const char* mimeType) { return OK; }
 
         // the name will used for sorting value order on results.
-        bool handleStringTag(const char* name, const char* value) {
+        status_t handleStringTag(const char* name, const char* value) {
             if (results == NULL)
-                return false;
+                return UNKNOWN_ERROR;
 
             int conLen = strlen(name) + strlen(value) + 1;
             char *conBuff = new char[conLen];
             if (!conBuff)
-                return false;
+                return UNKNOWN_ERROR;
 
             sprintf(conBuff, "%s%s", name, value);
 
@@ -73,7 +73,7 @@ class TestableMediaScannerClient : public MediaScannerClient {
 
             delete[] conBuff;
 
-            return true;
+            return OK;
         }
 
         bool addNativeStringTag(const char* name, const char* value) {
