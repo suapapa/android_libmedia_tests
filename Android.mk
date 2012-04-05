@@ -11,7 +11,8 @@ test_src_files := \
 shared_libraries := \
 	libstlport \
 	libutils \
-	libmedia
+	libmedia \
+	libicuuc
 
 static_libraries := \
 	libgtest \
@@ -21,6 +22,7 @@ c_includes := \
     bionic \
     bionic/libstdc++/include \
     external/gtest/include \
+    external/icu4c/common \
     external/stlport/stlport
 
 module_tags := eng tests
